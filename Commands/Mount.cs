@@ -11,7 +11,7 @@ namespace EliphatFS.Commands
     {
         public static void Run(string share, string mountpoint)
         {
-            Process.Start("mount", new[] { "-t", "nfs", share, mountpoint }).WaitForExit();
+            Process.Start("mount", new[] { "-t", "nfs", "-o", "mountport=2049,port=2049,nfsvers=3,proto=tcp", share, mountpoint }).WaitForExit();
         }
     }
 }
