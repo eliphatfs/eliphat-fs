@@ -20,7 +20,8 @@ namespace EliphatFS.Commands
             while (true)
                 try
                 {
-                    await forwarder.Run();
+                    await forwarder.Run(async () => { Console.WriteLine("First packet received. Starting new connector."); await Run(ip); });
+                    Console.WriteLine($"Ended connection, back off in {500 * backoff} ms");
                     backoff = 1;
                 }
                 catch (Exception ex)

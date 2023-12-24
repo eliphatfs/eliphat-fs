@@ -18,7 +18,7 @@ namespace EliphatFS.Transport
         {
             await RunForwarding(src, dst);
         }
-        public async Task RunForwarding(TcpClient src, TcpClient dst)
+        public async Task RunForwarding(TcpClient src, TcpClient dst, Action? onFirstPacket = null)
         {
             try
             {
@@ -27,8 +27,8 @@ namespace EliphatFS.Transport
                 dst.ReceiveBufferSize = 128 * 1024;
                 dst.SendBufferSize = 128 * 1024;
                 await Task.WhenAll(
-                    RunPassThrough(src, dst),
-                    RunPassThrough(dst, src)
+                    RunPassThrough(src, dst, () => { onFirstPacket?.Invoke(); onFirstPacket = null; }),
+                    RunPassThrough(dst, src, () => { onFirstPacket?.Invoke(); onFirstPacket = null; })
                 );
             }
             finally
@@ -38,22 +38,31 @@ namespace EliphatFS.Transport
                 dst.Close();
             }
         }
-        public async Task RunPassThrough(TcpClient readEnd, TcpClient writeEnd)
+        public async Task RunPassThrough(TcpClient readEnd, TcpClient writeEnd, Action? onFirstPacket = null)
         {
-            await using var sr = readEnd.GetStream();
-            await using var sw = writeEnd.GetStream();
-            byte[] buffer = new byte[65536];  // max tcp window size
-            byte[] back = new byte[65536];  // double buffer
-            ValueTask lastTask = ValueTask.CompletedTask;
-            while (!canceller.IsCancellationRequested)
+            try
             {
-                if (!readEnd.Connected) break;
-                var count = await sr.ReadAsync(buffer, canceller.Token);
-                if (!writeEnd.Connected) break;
-                await lastTask;
-                if (!writeEnd.Connected) break;
-                lastTask = sw.WriteAsync(buffer.AsMemory(0, count), canceller.Token);
-                (buffer, back) = (back, buffer);
+                await using var sr = readEnd.GetStream();
+                await using var sw = writeEnd.GetStream();
+                byte[] buffer = new byte[65536];  // max tcp window size
+                byte[] back = new byte[65536];  // double buffer
+                ValueTask lastTask = ValueTask.CompletedTask;
+                while (!canceller.IsCancellationRequested)
+                {
+                    if (!readEnd.Connected) break;
+                    var count = await sr.ReadAsync(buffer, canceller.Token);
+                    onFirstPacket?.Invoke();
+                    onFirstPacket = null;
+                    if (!writeEnd.Connected) break;
+                    await lastTask;
+                    if (!writeEnd.Connected) break;
+                    lastTask = sw.WriteAsync(buffer.AsMemory(0, count), canceller.Token);
+                    (buffer, back) = (back, buffer);
+                }
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Console.WriteLine(ex);
             }
         }
 

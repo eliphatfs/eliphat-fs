@@ -25,7 +25,7 @@ namespace EliphatFS.Transport
             dst = destination;
         }
 
-        public async Task Run()
+        public async Task Run(Action? onFirstPacket = null)
         {
             using var csrc = new TcpClient();
             using var cdst = new TcpClient();
@@ -33,7 +33,7 @@ namespace EliphatFS.Transport
             cdst.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             await csrc.ConnectAsync(src, canceller.Token);
             await cdst.ConnectAsync(dst, canceller.Token);
-            await RunForwarding(csrc, cdst);
+            await RunForwarding(csrc, cdst, onFirstPacket);
         }
     }
 }
