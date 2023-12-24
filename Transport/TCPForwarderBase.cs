@@ -22,6 +22,10 @@ namespace EliphatFS.Transport
         {
             try
             {
+                src.ReceiveBufferSize = 128 * 1024;
+                src.SendBufferSize = 128 * 1024;
+                dst.ReceiveBufferSize = 128 * 1024;
+                dst.SendBufferSize = 128 * 1024;
                 await Task.WhenAll(
                     RunPassThrough(src, dst),
                     RunPassThrough(dst, src)
@@ -38,7 +42,7 @@ namespace EliphatFS.Transport
         {
             await using var sr = readEnd.GetStream();
             await using var sw = writeEnd.GetStream();
-            byte[] buffer = new byte[65536];  // max tcp packet size
+            byte[] buffer = new byte[65536];  // max tcp window size
             byte[] back = new byte[65536];  // double buffer
             ValueTask lastTask = ValueTask.CompletedTask;
             while (!canceller.IsCancellationRequested)
