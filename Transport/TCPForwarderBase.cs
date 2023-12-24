@@ -20,12 +20,10 @@ namespace EliphatFS.Transport
         }
         public async Task RunForwarding(TcpClient src, TcpClient dst, Action? onFirstPacket = null)
         {
+            string connectorString = "";
             try
             {
-                src.ReceiveBufferSize = 128 * 1024;
-                src.SendBufferSize = 128 * 1024;
-                dst.ReceiveBufferSize = 128 * 1024;
-                dst.SendBufferSize = 128 * 1024;
+                connectorString = $"{src.Client.RemoteEndPoint} <-> {dst.Client.RemoteEndPoint}";
                 await Task.WhenAll(
                     RunPassThrough(src, dst, () => { onFirstPacket?.Invoke(); onFirstPacket = null; }),
                     RunPassThrough(dst, src, () => { onFirstPacket?.Invoke(); onFirstPacket = null; })
@@ -33,7 +31,7 @@ namespace EliphatFS.Transport
             }
             finally
             {
-                Console.WriteLine($"Ending connector: {src.Client.RemoteEndPoint} <-> {dst.Client.RemoteEndPoint}");
+                Console.WriteLine($"Ending connector: {connectorString}");
                 src.Close();
                 dst.Close();
             }
@@ -44,23 +42,25 @@ namespace EliphatFS.Transport
             {
                 await using var sr = readEnd.GetStream();
                 await using var sw = writeEnd.GetStream();
-                byte[] buffer = new byte[65536];  // max tcp window size
-                byte[] back = new byte[65536];  // double buffer
+                byte[] buffer = new byte[readEnd.ReceiveBufferSize];  // max tcp window size
+                byte[] back = new byte[readEnd.ReceiveBufferSize];  // double buffer
                 ValueTask lastTask = ValueTask.CompletedTask;
                 while (!canceller.IsCancellationRequested)
                 {
-                    if (!readEnd.Connected) break;
                     var count = await sr.ReadAsync(buffer, canceller.Token);
                     onFirstPacket?.Invoke();
                     onFirstPacket = null;
-                    if (!writeEnd.Connected) break;
+                    if (count == 0) break;
                     await lastTask;
-                    if (!writeEnd.Connected) break;
                     lastTask = sw.WriteAsync(buffer.AsMemory(0, count), canceller.Token);
                     (buffer, back) = (back, buffer);
                 }
             }
             catch (ObjectDisposedException ex)
+            {
+                Console.WriteLine(ex);
+            }
+            catch (IOException ex)
             {
                 Console.WriteLine(ex);
             }
