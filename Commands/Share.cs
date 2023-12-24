@@ -12,7 +12,7 @@ namespace EliphatFS.Commands
         public static void Run(string path)
         {
             File.WriteAllText("exports", $"{path} 127.0.0.1(rw,insecure,all_squash,anonuid=0,anongid=0)");
-            Process.Start("unfsd", new[] { "-t", "-p", "-e", "exports" }).WaitForExit();
+            Process.Start("unfsd", new[] { "-t", "-p", "-e", Path.GetFullPath("exports") }).WaitForExit();
         }
     }
 }
